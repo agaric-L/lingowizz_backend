@@ -1,43 +1,29 @@
-# render.yaml - 适用于您的 Flask 应用的完整、安全配置
+# render.yaml - 明确指定使用免费套餐
 
 services:
-  # 您的主 Web 应用服务
   - type: web
-    name: lingowizz-backend  # 您的服务名称
-    env: python             # 指定环境为 Python
-    region: oregon          # 您可以选择一个离您用户近的区域, e.g., ohio, frankfurt
-
-    # 关键：构建和启动配置
-    # --------------------------
+    name: lingowizz-backend
+    env: python
+    
+    plan: free # <--- 明确添加这一行，告诉Render为此服务使用免费套餐
+    
+    region: oregon 
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
-    startCommand: "gunicorn run:app"  # 假设您的主文件是 app.py, Flask实例是 app。如果不是，请修改这里！
-
-    # 关键：环境变量配置
-    # --------------------------
+    startCommand: "gunicorn app:app" 
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.9  # ！！！使用稳定的Python版本来避免构建错误
-
+        value: 3.11.9
       - key: FLASK_ENV
-        value: production  # 部署时应使用生产环境，而不是 development
-
-      # --- 以下是需要您在Render仪表盘手动设置的【秘密】变量 ---
-      # 'sync: false' 告诉Render不要从这个文件同步值，而是使用你在UI中设置的值。
-      
+        value: production
       - key: DATABASE_URL
-        sync: false  # 您的数据库连接字符串，包含密码，是秘密！
-
+        sync: false
       - key: ZHIPU_API_KEY
-        sync: false  # 您的智谱AI密钥，是秘密！
-      
+        sync: false
       - key: vivo_app_id
-        sync: false  # vivo的ID，作为秘密处理更安全
-
+        sync: false
       - key: vivo_app_key
-        sync: false  # vivo的密钥，是秘密！
-
-      # --- Render将为您自动生成这个密钥 ---
+        sync: false
       - key: SECRET_KEY
-        generateValue: true # 让Render为您生成一个安全的、随机的Flask密钥
+        generateValue: true
