@@ -1,0 +1,14 @@
+# render.yaml - 最简配置
+services:
+  - type: web
+    name: lingowizz                 # 给你的服务起一个名字
+    env: python                        # 指定环境为 Python
+    
+    # 关键：通过环境变量指定一个稳定的 Python 版本来解决构建错误
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9                  # 强制使用 Python 3.11，避免 3.13 的兼容性问题
+
+    # 构建和启动命令
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn run:app" # 务必将这里替换成你自己的启动命令
