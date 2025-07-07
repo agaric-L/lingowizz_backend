@@ -1,4 +1,4 @@
-# image_recognition.py (最终修复版)
+# image_recognition.py
 
 import os
 import json
@@ -7,14 +7,8 @@ from typing import List, Dict, Any
 
 # 图像处理和模型库
 import cv2
-from PIL import Image
+from PIL import Image  # Pillow库对于显示图片至关重要
 import torch
-from torch import nn
-
-# --- ↓↓↓ 核心修改：导入所有可能需要的 ultralytics 模块 ↓↓↓ ---
-# 这是一个更全面的列表，旨在一次性解决所有 "Unsupported global" 问题
-from ultralytics.nn import tasks, modules
-# --- ↑↑↑ 核心修改：导入所有可能需要的 ultralytics 模块 ↑↑↑ ---
 
 # ultralytics 用于 YOLOv8 模型
 try:
@@ -38,35 +32,25 @@ class ImageRecognitionService:
     - 使用 YOLOv8 进行物体检测和分割。
     - 使用 智普AI GLM-4 进行单词定义。
     """
+    
     def __init__(self):
-        # ！！！安全警告：在生产环境中，绝不要硬编码API密钥！
-        # 应该从环境变量中读取，例如: os.getenv("ZHIPU_API_KEY")
-        self.zhipu_api_key = "482802cba1a144518285e3fb10068f4d.9drwfXmNcnr25cIe"
-        
+        # 配置API密钥
+        self.zhipu_api_key="482802cba1a144518285e3fb10068f4d.9drwfXmNcnr25cIe"
+        # --- 智普AI客户端初始化 ---
         self.zhipu_client = None
         if self.zhipu_api_key and ZhipuAI:
             self.zhipu_client = ZhipuAI(api_key=self.zhipu_api_key)
             print("ZhipuAI client initialized.")
 
-        # --- YOLOv8模型初始化 (最终修复) ---
+        # --- YOLOv8模型初始化 ---
         self.yolo_model = None
         if YOLO:
             try:
                 print("Loading YOLOv8 model...")
-                # --- ↓↓↓ 核心修复代码在此 ↓↓↓ ---
-                # 将 PyTorch 自身的 nn 模块和 ultralytics 的 tasks、modules 模块都加入信任列表
-                # 这是一个更广泛的信任策略，希望能覆盖所有需要的类
-                trusted_modules = [nn, tasks, modules]
-                
-                with torch.serialization.safe_globals(trusted_modules):
-                    self.yolo_model = YOLO("yolov8n.pt")
-                # --- ↑↑↑ 核心修复代码在此 ↑↑↑ ---
-                
+                self.yolo_model = YOLO("yolov8n.pt")
                 print("YOLOv8 model loaded successfully.")
             except Exception as e:
-                import traceback
-                print(f"Failed to load YOLOv8 model. Error: {e}")
-                traceback.print_exc()
+                print(f"Failed to load YOLOv8 model: {e}")
 
     def encode_image_to_base64(self, image_path: str) -> str:
         """将图片编码为base64格式"""
@@ -165,6 +149,9 @@ class ImageRecognitionService:
                 segmented_filename = f"segmented_{obj_name_safe}_{obj['id']}.png"
                 segmented_path = os.path.join(upload_folder, segmented_filename)
                 cv2.imwrite(segmented_path, cropped_image)
+                # !! 注意：这里原本的字典格式有误，已修正
+                # 错误：**obj, 'key': value
+                # 正确：**obj, **{'key': value} 或用 update
                 updated_obj = obj.copy()
                 updated_obj.update({
                     'segmented_image_path_local': segmented_path,
@@ -176,6 +163,7 @@ class ImageRecognitionService:
             print(f"Error creating segmented images: {e}")
             return []
 
+    # --- 新增辅助方法: 识别单个物体 ---
     def _identify_single_object_glm4v(self, image_path: str) -> str:
         """使用GLM-4V识别单个裁剪后的图片中的物体名称"""
         if not self.zhipu_client:
@@ -206,6 +194,7 @@ class ImageRecognitionService:
             print(f"Error identifying single object with GLM-4V: {e}")
             return "unknown"
 
+    # --- 新增主方法: 结合YOLO分割和GLM-4V识别 (更新版) ---
     def segment_and_identify_combined(self, image_path: str, upload_folder: str) -> List[Dict[str, Any]]:
         """
         第一步: 使用YOLOv8进行快速分割，并保存小图。
@@ -213,6 +202,7 @@ class ImageRecognitionService:
         第三步: 返回与原格式完全相同的JSON，仅更新'name'字段。
         """
         print("\nStep 1: Segmenting objects with YOLOv8...")
+        # 首先，使用YOLO获取所有分割后的对象信息（包括小图的本地路径）
         yolo_detected_objects = self.segment_objects_yolo(image_path, upload_folder)
         
         if not yolo_detected_objects:
@@ -229,12 +219,18 @@ class ImageRecognitionService:
             
             print(f"  - Identifying object {i+1}/{len(yolo_detected_objects)} (YOLO says: '{obj['name']}')...")
             
+            # 使用GLM-4V识别这个小图
             glm4v_name = self._identify_single_object_glm4v(local_path)
             
             print(f"    -> GLM-4V says: '{glm4v_name}'")
 
+            # --- ↓↓↓ 核心修改在此 ↓↓↓ ---
+            # 复制原始的YOLO检测结果字典
             final_obj = obj.copy()
+            # 仅用GLM-4V的识别结果覆盖'name'字段
             final_obj['name'] = glm4v_name
+            # --- ↑↑↑ 核心修改在此 ↑↑↑ ---
+
             final_identified_objects.append(final_obj)
             
         return final_identified_objects
@@ -295,11 +291,12 @@ if __name__ == '__main__':
         print(f"ERROR: Test image not found at '{test_image_path}'")
         print("Please place a JPEG image named 'test_image2.jpg' in the 'test_images' directory to run the test.")
     else:
-        # 这里为了保持一致性，直接使用全局实例
         service = image_recognition_service
+
+        # ... (TEST 1, 2, 3 保持不变，这里为了简洁省略它们的打印部分) ...
         
         # --- 新增测试: 结合YOLO分割和GLM-4V识别 ---
-        print("\n--- TEST: Combined Segmentation (YOLOv8) and Identification (GLM-4V) ---")
+        print("\n--- TEST 4: Combined Segmentation (YOLOv8) and Identification (GLM-4V) ---")
         combined_results = service.segment_and_identify_combined(test_image_path, upload_folder=upload_dir)
         
         if combined_results:
@@ -308,7 +305,7 @@ if __name__ == '__main__':
             print(json.dumps(combined_results, indent=2, ensure_ascii=False))
         else:
             print("The combined process did not yield any results.")
-        print("--- END OF TEST ---\n")
+        print("--- END OF TEST 4 ---\n")
 
 
     print("\n" + "="*60)
