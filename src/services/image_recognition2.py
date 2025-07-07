@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 import cv2
 from PIL import Image
 import torch
+from torch import nn  # <--- 确保导入了 nn
 from ultralytics.nn.tasks import DetectionModel # 导入需要被信任的类
 
 # ultralytics 用于 YOLOv8 模型
@@ -31,33 +32,31 @@ class ImageRecognitionService:
     - 使用 YOLOv8 进行物体检测和分割。
     - 使用 智普AI GLM-4 进行单词定义。
     """
-    
     def __init__(self):
-        # ！！！注意：在生产环境中，密钥永远不要硬编码在代码里！
-        # 应该从环境变量中读取，就像我们为 Render 做的那样。
+        # 推荐从环境变量读取密钥
         # self.zhipu_api_key = os.getenv("ZHIPU_API_KEY") 
         self.zhipu_api_key = "482802cba1a144518285e3fb10068f4d.9drwfXmNcnr25cIe"
         
-        # --- 智普AI客户端初始化 ---
         self.zhipu_client = None
         if self.zhipu_api_key and ZhipuAI:
             self.zhipu_client = ZhipuAI(api_key=self.zhipu_api_key)
             print("ZhipuAI client initialized.")
 
-        # --- YOLOv8模型初始化 (关键修改) ---
+        # --- YOLOv8模型初始化 (最终修复) ---
         self.yolo_model = None
         if YOLO:
             try:
                 print("Loading YOLOv8 model...")
                 # --- ↓↓↓ 核心修复代码在此 ↓↓↓ ---
-                # 使用 PyTorch 的安全上下文管理器来加载模型
-                # 这告诉 PyTorch，我们信任 ultralytics 的 DetectionModel 类
-                with torch.serialization.safe_globals([DetectionModel]):
+                # 将所有需要的类都添加到信任列表中
+                trusted_classes = [DetectionModel, nn.Sequential]
+                
+                with torch.serialization.safe_globals(trusted_classes):
                     self.yolo_model = YOLO("yolov8n.pt")
                 # --- ↑↑↑ 核心修复代码在此 ↑↑↑ ---
+                
                 print("YOLOv8 model loaded successfully.")
             except Exception as e:
-                # 打印详细的错误信息，便于调试
                 import traceback
                 print(f"Failed to load YOLOv8 model. Error: {e}")
                 traceback.print_exc()
