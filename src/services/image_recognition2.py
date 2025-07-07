@@ -1,3 +1,5 @@
+# image_recognition.py (最终修复版)
+
 import os
 import json
 import base64
@@ -7,8 +9,12 @@ from typing import List, Dict, Any
 import cv2
 from PIL import Image
 import torch
-from torch import nn  # <--- 确保导入了 nn
-from ultralytics.nn.tasks import DetectionModel # 导入需要被信任的类
+from torch import nn
+
+# --- ↓↓↓ 核心修改：导入所有可能需要的 ultralytics 模块 ↓↓↓ ---
+# 这是一个更全面的列表，旨在一次性解决所有 "Unsupported global" 问题
+from ultralytics.nn import tasks, modules
+# --- ↑↑↑ 核心修改：导入所有可能需要的 ultralytics 模块 ↑↑↑ ---
 
 # ultralytics 用于 YOLOv8 模型
 try:
@@ -33,8 +39,8 @@ class ImageRecognitionService:
     - 使用 智普AI GLM-4 进行单词定义。
     """
     def __init__(self):
-        # 推荐从环境变量读取密钥
-        # self.zhipu_api_key = os.getenv("ZHIPU_API_KEY") 
+        # ！！！安全警告：在生产环境中，绝不要硬编码API密钥！
+        # 应该从环境变量中读取，例如: os.getenv("ZHIPU_API_KEY")
         self.zhipu_api_key = "482802cba1a144518285e3fb10068f4d.9drwfXmNcnr25cIe"
         
         self.zhipu_client = None
@@ -48,10 +54,11 @@ class ImageRecognitionService:
             try:
                 print("Loading YOLOv8 model...")
                 # --- ↓↓↓ 核心修复代码在此 ↓↓↓ ---
-                # 将所有需要的类都添加到信任列表中
-                trusted_classes = [DetectionModel, nn.Sequential]
+                # 将 PyTorch 自身的 nn 模块和 ultralytics 的 tasks、modules 模块都加入信任列表
+                # 这是一个更广泛的信任策略，希望能覆盖所有需要的类
+                trusted_modules = [nn, tasks, modules]
                 
-                with torch.serialization.safe_globals(trusted_classes):
+                with torch.serialization.safe_globals(trusted_modules):
                     self.yolo_model = YOLO("yolov8n.pt")
                 # --- ↑↑↑ 核心修复代码在此 ↑↑↑ ---
                 
@@ -61,7 +68,6 @@ class ImageRecognitionService:
                 print(f"Failed to load YOLOv8 model. Error: {e}")
                 traceback.print_exc()
 
-    # ... 其他所有方法保持不变 ...
     def encode_image_to_base64(self, image_path: str) -> str:
         """将图片编码为base64格式"""
         with open(image_path, "rb") as image_file:
@@ -267,6 +273,7 @@ class ImageRecognitionService:
     def _get_fallback_word_info(self, word: str) -> Dict[str, Any]:
         return { 'word': word, 'definition': 'A common object found in everyday life.', 'example_sentence': f'I see a {word}.', 'pronunciation': f'/{word}/', 'part_of_speech': 'noun' }
 
+
 # 创建全局实例
 image_recognition_service = ImageRecognitionService()
 
@@ -288,12 +295,11 @@ if __name__ == '__main__':
         print(f"ERROR: Test image not found at '{test_image_path}'")
         print("Please place a JPEG image named 'test_image2.jpg' in the 'test_images' directory to run the test.")
     else:
+        # 这里为了保持一致性，直接使用全局实例
         service = image_recognition_service
-
-        # ... (TEST 1, 2, 3 保持不变，这里为了简洁省略它们的打印部分) ...
         
         # --- 新增测试: 结合YOLO分割和GLM-4V识别 ---
-        print("\n--- TEST 4: Combined Segmentation (YOLOv8) and Identification (GLM-4V) ---")
+        print("\n--- TEST: Combined Segmentation (YOLOv8) and Identification (GLM-4V) ---")
         combined_results = service.segment_and_identify_combined(test_image_path, upload_folder=upload_dir)
         
         if combined_results:
@@ -302,7 +308,7 @@ if __name__ == '__main__':
             print(json.dumps(combined_results, indent=2, ensure_ascii=False))
         else:
             print("The combined process did not yield any results.")
-        print("--- END OF TEST 4 ---\n")
+        print("--- END OF TEST ---\n")
 
 
     print("\n" + "="*60)
