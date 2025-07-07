@@ -2,9 +2,23 @@ Flask==2.3.3
 Flask-SQLAlchemy==3.0.5
 Flask-CORS==4.0.0
 Werkzeug==2.3.7
-Pillow>=10.1.0
+Pillow==10.0.1
 requests==2.31.0
 psycopg2-binary==2.9.9
 python-dotenv==1.0.0
+opencv-python==4.8.1.78
 numpy>=1.24.3
-gunicorn==21.2.0
+# YOLOv8/Ultralytics依赖
+ultralytics==8.2.0
+# zhipuai官方SDK
+zhipuai>=2.0.0
+# 兼容YOLO和zhipuai的依赖
+httpx>=0.23.0
+pydantic>=1.9.0,<3.0.0
+typing-extensions>=4.0.0
+scipy>=1.4.1
+torch>=1.10.0
+torchvision>=0.11.0
+tqdm>=4.64.0
+pyyaml>=5.3.1
+
