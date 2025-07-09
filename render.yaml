@@ -12,7 +12,7 @@ services:
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
-    startCommand: "python -m gunicorn run:app"  # 假设您的主文件是 app.py, Flask实例是 app。如果不是，请修改这里！
+    startCommand: "python -m gunicorn run:app"
 
     # 关键：环境变量配置
     # --------------------------
@@ -21,23 +21,31 @@ services:
         value: 3.11.9  # ！！！使用稳定的Python版本来避免构建错误
 
       - key: FLASK_ENV
-        value: production  # 部署时应使用生产环境，而不是 development
+        value: production  # 部署时应使用生产环境
+
+      # --- 新增的非敏感环境变量 ---
+      - key: HF_API_URL
+        value: "https://mfuhb8ole0ld4d0p.us-east-1.aws.endpoints.huggingface.cloud"
 
       # --- 以下是需要您在Render仪表盘手动设置的【秘密】变量 ---
       # 'sync: false' 告诉Render不要从这个文件同步值，而是使用你在UI中设置的值。
       
       - key: DATABASE_URL
-        sync: false  # 您的数据库连接字符串，包含密码，是秘密！
+        sync: false  # 您的数据库连接字符串
 
       - key: ZHIPU_API_KEY
-        sync: false  # 您的智谱AI密钥，是秘密！
-      
+        sync: false  # 您的智谱AI密钥
+
       - key: vivo_app_id
-        sync: false  # vivo的ID，作为秘密处理更安全
+        sync: false  # vivo的ID
 
       - key: vivo_app_key
-        sync: false  # vivo的密钥，是秘密！
+        sync: false  # vivo的密钥
 
+      # --- 新增的秘密环境变量 ---
+      - key: HF_API_TOKEN
+        sync: false  # 您的Hugging Face Token，是秘密！
+      
       # --- Render将为您自动生成这个密钥 ---
       - key: SECRET_KEY
         generateValue: true # 让Render为您生成一个安全的、随机的Flask密钥
